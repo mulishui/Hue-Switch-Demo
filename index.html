@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>色相切换 Demo</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f2f2f2;
+    font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+  }
+  .stage {
+    width: 380px;
+    padding: 48px 24px;
+    text-align: center;
+  }
+  .circle {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    margin: 0 auto 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.15s ease;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+  }
+  .circle svg {
+    width: 44px;
+    height: 44px;
+    fill: #fff;
+    opacity: 0.95;
+  }
+  .btn-row {
+    display: flex;
+    justify-content: center;
+    gap: 100px;
+    margin-bottom: 32px;
+  }
+  .btn {
+    width: 54px;
+    height: 54px;
+    border-radius: 10px;
+    background: #e3e3e3;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn:hover { background: #d4d4d4; }
+  .btn:active { background: #c4c4c4; }
+  .btn svg {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: #555;
+    stroke-width: 2.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .info {
+    font-size: 13px;
+    color: #888;
+    margin-bottom: 28px;
+    line-height: 1.8;
+  }
+  .info b { color: #333; font-weight: 600; }
+  .panel {
+    text-align: left;
+    background: #fff;
+    border-radius: 12px;
+    padding: 18px 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .field {
+    margin-bottom: 16px;
+  }
+  .field:last-child { margin-bottom: 0; }
+  .field label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #555;
+    margin-bottom: 6px;
+  }
+  .field label span.val {
+    color: #111;
+    font-weight: 600;
+  }
+  input[type="range"] {
+    width: 100%;
+    accent-color: #ff6a6a;
+  }
+  input[type="number"] {
+    width: 70px;
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="circle" id="circle">
+    <svg viewBox="0 0 24 24"><path d="M12 2C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zM9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1z"/></svg>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn" id="btnLeft" aria-label="上一档">
+      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    </button>
+    <button class="btn" id="btnRight" aria-label="下一档">
+      <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
+    </button>
+  </div>
+
+  <div class="info">
+    色值 <b id="hexVal">#FF6A6A</b>　|　色相 <b id="hueVal">0°</b><br>
+    第 <b id="stepIndex">1</b> / <span id="stepTotalText">12</span> 档
+  </div>
+
+  <div class="panel">
+    <div class="field">
+      <label>饱和度 Saturation（明度固定 100%，0%=白色，100%=纯hue色）<span class="val" id="satVal">100%</span></label>
+      <input type="range" id="satSlider" min="0" max="100" value="100">
+    </div>
+    <div class="field">
+      <label>档位数（转一圈需要的档数）</label>
+      <input type="number" id="stepsInput" min="2" max="36" value="12">
+    </div>
+  </div>
+</div>
+
+<script>
+  // ---- 颜色换算工具（HSB / HSV 模型，与 Figma 色板一致）----
+  function rgbToHsv(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    const d = max - min;
+    let h;
+    if (d === 0) h = 0;
+    else if (max === r) h = 60 * (((g - b) / d) % 6);
+    else if (max === g) h = 60 * ((b - r) / d + 2);
+    else h = 60 * ((r - g) / d + 4);
+    if (h < 0) h += 360;
+    const s = max === 0 ? 0 : d / max;
+    const v = max;
+    return { h, s: s * 100, v: v * 100 };
+  }
+
+  function hsvToHex(h, s, v) {
+    s /= 100; v /= 100;
+    const c = v * s;
+    const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+    const m = v - c;
+    let r, g, b;
+    if (h < 60) { r = c; g = x; b = 0; }
+    else if (h < 120) { r = x; g = c; b = 0; }
+    else if (h < 180) { r = 0; g = c; b = x; }
+    else if (h < 240) { r = 0; g = x; b = c; }
+    else if (h < 300) { r = c; g = 0; b = x; }
+    else { r = x; g = 0; b = c; }
+    const toHex = n => Math.round((n + m) * 255).toString(16).padStart(2, '0');
+    return '#' + (toHex(r) + toHex(g) + toHex(b)).toUpperCase();
+  }
+
+  // ---- 初始状态：从 #FF6A6A 反推 HSB（h≈0°, s≈58.4%, v=100%）----
+  const initial = rgbToHsv(255, 106, 106);
+  const state = {
+    h: initial.h,
+    s: initial.s,
+    v: initial.v,   // 明度固定不变，本 demo 不提供调整入口
+    steps: 12,
+    stepIndex: 0    // 当前处在第几档（从 0 开始）
+  };
+
+  const circle = document.getElementById('circle');
+  const hexVal = document.getElementById('hexVal');
+  const hueVal = document.getElementById('hueVal');
+  const stepIndexEl = document.getElementById('stepIndex');
+  const stepTotalText = document.getElementById('stepTotalText');
+  const satSlider = document.getElementById('satSlider');
+  const satVal = document.getElementById('satVal');
+  const stepsInput = document.getElementById('stepsInput');
+
+  function render() {
+    const hex = hsvToHex(state.h, state.s, state.v);
+    circle.style.backgroundColor = hex;
+    hexVal.textContent = hex;
+    hueVal.textContent = Math.round(state.h) + '°';
+    stepIndexEl.textContent = state.stepIndex + 1;
+    stepTotalText.textContent = state.steps;
+  }
+
+  function stepDegree() {
+    return 360 / state.steps;
+  }
+
+  document.getElementById('btnLeft').addEventListener('click', () => {
+    state.stepIndex = (state.stepIndex - 1 + state.steps) % state.steps;
+    state.h = state.stepIndex * stepDegree();
+    render();
+  });
+
+  document.getElementById('btnRight').addEventListener('click', () => {
+    state.stepIndex = (state.stepIndex + 1) % state.steps;
+    state.h = state.stepIndex * stepDegree();
+    render();
+  });
+
+  satSlider.addEventListener('input', (e) => {
+    state.s = Number(e.target.value);
+    satVal.textContent = state.s + '%';
+    render();
+  });
+
+  stepsInput.addEventListener('change', (e) => {
+    let v = Number(e.target.value);
+    if (v < 2) v = 2;
+    if (v > 36) v = 36;
+    state.steps = v;
+    // 档位数变化后，保持当前 stepIndex，按新档位数重新计算角度
+    state.stepIndex = state.stepIndex % state.steps;
+    state.h = state.stepIndex * stepDegree();
+    e.target.value = v;
+    render();
+  });
+
+  // 初始渲染
+  satSlider.value = Math.round(state.s);
+  satVal.textContent = Math.round(state.s) + '%';
+  render();
+</script>
+
+</body>
+</html>
